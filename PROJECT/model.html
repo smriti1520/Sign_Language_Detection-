@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Language Detection — Demo</title>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --accent: #4f46e5;
+      --muted: #94a3b8;
+      --glass: rgba(255, 255, 255, 0.04);
+      --radius: 12px;
+      --gap: 16px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, 'Helvetica Neue', Arial;
+      color: #e6eef8;
+      background: linear-gradient(180deg, #071023 0%, #071428 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      border-radius: 16px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      align-items: start;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6)
+    }
+
+    header {
+      grid-column: 1/-1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px
+    }
+
+    header h1 {
+      font-size: 20px;
+      margin: 0
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .left {
+      background: var(--card);
+      padding: 14px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .video-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      max-height: 520px;
+      display: block
+    }
+
+    canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    button {
+      background: var(--accent);
+      border: 0;
+      color: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--muted)
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .right {
+      background: var(--card);
+      padding: 14px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .card {
+      background: var(--glass);
+      padding: 12px;
+      border-radius: 12px
+    }
+
+    .pred-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .pred {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01))
+    }
+
+    .pred strong {
+      font-size: 16px
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .footer {
+      grid-column: 1/-1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px
+    }
+
+    @media(max-width:900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+
+      .right {
+        order: 2
+      }
+    }
+    .age-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.age-select label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.age-select select {
+  background: var(--glass);
+  color: #e6eef8;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  border-radius: 10px;
+  outline: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.age-select select option {
+  background: #0b1220;
+  color: white;
+}
+
+  </style>
+</head>
+
+<body>
+  <div class="container" id="app">
+    <header>
+      <div>
+        <h1>Sign Language Detection — Demo</h1>
+        <p>Responsive web UI with webcam capture & live hand detection (TensorFlow.js)</p>
+      </div>
+      <div class="status" id="status">Status: Idle</div>
+    </header>
+
+    <section class="left">
+      <div class="video-wrap">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div class="age-select">
+  <label for="ageGroup">Select Group</label>
+  <select id="ageGroup">
+    <option value="adult">Adult</option>
+    <option value="children">Children</option>
+  </select>
+</div>
+
+      </div>
+
+      <div class="controls">
+        <button id="startBtn">Start Camera</button>
+        <button id="stopBtn" class="ghost">Stop Camera</button>
+        <button id="detectBtn">Start Detection</button>
+        <button id="stopDetectBtn" class="ghost">Stop Detection</button>
+        <button id="snapshotBtn" class="ghost">Snapshot</button>
+      </div>
+
+      <div class="card">
+        <div class="muted">Model:</div>
+        <div id="modelInfo">No model loaded. Uses <code>@tensorflow-models/handpose</code> if available.</div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card">
+        <strong>Live Predictions</strong>
+        <div class="pred-list" id="predictions">
+          <div class="pred"><span class="muted">No prediction yet</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <strong>How to use</strong>
+        <ol class="muted">
+          <li>Click <b>Start Camera</b> and allow webcam access.</li>
+          <li>Click <b>Start Detection</b> to run the hand detection loop.</li>
+          <li>Snapshot saves a picture to help label data or test offline.</li>
+          <li>Replace the placeholder mapping with your trained gesture model for real sign classification.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <strong>Notes</strong>
+        <p class="muted">This demo visualizes hand landmarks. For production sign recognition, train a classifier (e.g.,
+          small CNN or MLP) on landmark/keypoint features or frame sequences (for dynamic signs).</p>
+      </div>
+    </aside>
+
+    <div class="footer">
+      <div>Built with vanilla JS</div>
+      <div>Responsive</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
+
+  <script>
+    const GESTURE_LABELS = [
+  "A",
+  "B",
+  "C",
+  "Fist",
+  "OpenPalm",
+  "Peace"
+];
+
+    // Elements
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const modelInfo = document.getElementById('modelInfo');
+    const predsEl = document.getElementById('predictions');
+
+    let stream = null;
+    let model = null;
+    let detecting = false;
+    let detectLoopId = null;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        resizeCanvas();
+        status('Camera started');
+      } catch (e) {
+        console.error(e);
+        status('Camera error: ' + e.message);
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        video.pause();
+        video.srcObject = null;
+        status('Camera stopped');
+      }
+    }
+
+    function resizeCanvas() {
+      overlay.width = video.videoWidth || 640;
+      overlay.height = video.videoHeight || 480;
+    }
+
+    function status(text) { statusEl.textContent = 'Status: ' + text; }
+
+    async function loadModel() {
+      let gestureModel = null;
+
+async function loadGestureModel() {
+  try {
+    gestureModel = await tf.loadLayersModel(
+      "model/gesture_model.json"
+    );
+    console.log("Gesture model loaded");
+  } catch (e) {
+    console.warn("Gesture model not found, using heuristic fallback");
+  }
+}
+
+      status('Loading model...');
+      modelInfo.textContent = 'Loading @tensorflow-models/handpose...';
+      try {
+        model = await handpose.load();
+        modelInfo.textContent = 'handpose model loaded (landmark detector)';
+        status('Model loaded');
+      } catch (e) {
+        console.error(e);
+        modelInfo.textContent = 'Failed to load handpose. You can still capture video and snapshot.';
+        status('Model load failed');
+        
+      }
+    }
+
+    function drawKeypoints(predictions) {
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      if (!predictions || predictions.length === 0) return;
+      predictions.forEach(pred => {
+        const landmarks = pred.landmarks;
+        // draw points
+        for (let i = 0; i < landmarks.length; i++) {
+          const [x, y, z] = landmarks[i];
+          ctx.beginPath(); ctx.arc(x, y, 4, 0, 2 * Math.PI); ctx.fillStyle = '#4f46e5aa'; ctx.fill();
+        }
+        // draw skeleton (simple connections)
+        const connections = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20]];
+        ctx.lineWidth = 2; ctx.strokeStyle = '#7dd3fc';
+        connections.forEach(pair => {
+          const a = landmarks[pair[0]]; const b = landmarks[pair[1]];
+          if (a && b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+        });
+      });
+    }
+
+    // Simple heuristic classifier using landmarks distances (demo only)
+    function simpleHeuristicClassification(landmarks) {
+      // returns top guesses with confidence-like scores
+      if (!landmarks) return [];
+      // compute bounding box area and average finger curl-ish metric
+      const xs = landmarks.map(p => p[0]); const ys = landmarks.map(p => p[1]);
+      const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
+      const area = (xmax - xmin) * (ymax - ymin);
+      // examine tip distances to wrist to guess open/closed hand
+      const wrist = landmarks[0];
+      const tips = [4, 8, 12, 16, 20].map(i => landmarks[i]);
+      const avgTipDist = tips.reduce((s, p) => s + Math.hypot(p[0] - wrist[0], p[1] - wrist[1]), 0) / tips.length;
+      // fake mapping
+      const guesses = [];
+      if (avgTipDist < 40) guesses.push({ label: '', score: 0.9 });
+      else if (avgTipDist < 100) guesses.push({ label: 'I Care!', score: 0.7 });
+      else guesses.push({ label: 'Calm Down!', score: 0.95 });
+      return guesses;
+    }
+
+    async function detectLoop() {
+      if (!model) {
+        await loadModel();
+        if (!model) return; // can't run
+      }
+      detecting = true;
+      status('Detecting');
+      async function loop() {
+        if (!detecting) return;
+        if (video.readyState < 2) { detectLoopId = requestAnimationFrame(loop); return; }
+        resizeCanvas();
+        const predictions = await model.estimateHands(video, true);
+        drawKeypoints(predictions);
+        // update predictions panel
+        if (predictions && predictions.length > 0) {
+          const p = predictions[0];
+          const heur = simpleHeuristicClassification(p.landmarks);
+          renderPredictions(heur);
+        } else {
+          renderPredictions([]);
+        }
+        detectLoopId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function stopDetect() {
+      detecting = false;
+      if (detectLoopId) cancelAnimationFrame(detectLoopId);
+      status('Detection stopped');
+    }
+
+    function renderPredictions(list) {
+      predsEl.innerHTML = '';
+      if (!list || list.length === 0) {
+        predsEl.innerHTML = '<div class="pred"><span class="muted">No hand detected</span></div>';
+        return;
+      }
+      list.forEach(item => {
+        const div = document.createElement('div'); div.className = 'pred';
+        div.innerHTML = `<strong>${item.label}</strong><span class="muted">${(item.score * 100).toFixed(0)}%</span>`;
+        predsEl.appendChild(div);
+      });
+    }
+
+    function snapshot() {
+      const snap = document.createElement('canvas'); snap.width = overlay.width; snap.height = overlay.height; const sctx = snap.getContext('2d');
+      sctx.drawImage(video, 0, 0, snap.width, snap.height);
+      // draw overlays too (optional)
+      sctx.drawImage(overlay, 0, 0);
+      const url = snap.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = 'snapshot.png'; a.click();
+      status('Snapshot taken');
+    }
+
+    // Buttons
+    document.getElementById('startBtn').addEventListener('click', async () => { await startCamera(); });
+    document.getElementById('stopBtn').addEventListener('click', () => { stopCamera(); stopDetect(); });
+    document.getElementById('detectBtn').addEventListener('click', () => { if (!stream) startCamera().then(() => detectLoop()); else detectLoop(); });
+    document.getElementById('stopDetectBtn').addEventListener('click', () => { stopDetect(); });
+    document.getElementById('snapshotBtn').addEventListener('click', () => { snapshot(); });
+
+    // Responsive resize
+    window.addEventListener('resize', () => { if (video && video.videoWidth) resizeCanvas(); });
+
+    // Auto-load model lightly (optional): remove if you want to load lazily
+    // loadModel();
+
+    // Helpful: allow pressing 'd' to toggle detection for accessibility
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'd') {
+        if (detecting) stopDetect(); else detectLoop();
+      }
+    });
+    const ageGroupSelect = document.getElementById("ageGroup");
+
+ageGroupSelect.addEventListener("change", () => {
+  const group = ageGroupSelect.value;
+
+  if (group === "adult") {
+    status("Adult mode selected");
+    // Example: use adult gesture labels
+    // GESTURE_LABELS = [...];
+  } else {
+    status("Children mode selected");
+    // Example: use simpler gestures for kids
+    // GESTURE_LABELS = [...];
+  }
+});
+
+  </script>
+</body>
+
+</html>
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Language Detection — Demo</title>
+
+  <style>
+    /* ================= DOODLE BACKGROUND (ADDED) ================= */
+    .doodle-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+      background: radial-gradient(circle at 20% 20%, #1e293b, #020617);
+    }
+
+    .doodle {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 2px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  opacity: 0.18;
+  filter: blur(0.2px);
+  animation: float 18s linear infinite;
+  user-select: none;
+}
+  .doodle span {
+  display: inline-block;
+  animation: wiggle 2.4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.doodle:nth-child(2) span { animation-delay: 0.4s; }
+.doodle:nth-child(3) span { animation-delay: 0.8s; }
+.doodle:nth-child(4) span { animation-delay: 1.2s; }
+.doodle:nth-child(5) span { animation-delay: 1.6s; }
+
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(8deg); }
+  30%  { transform: rotate(-8deg); }
+  45%  { transform: rotate(6deg); }
+  60%  { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
+}
+
+
+    .doodle:nth-child(1) { top: 1%; left: 5%; animation-duration: 22s; }
+    .doodle:nth-child(2) { top: 70%; left: 5%; animation-duration: 26s; border-radius: 20%; }
+    .doodle:nth-child(3) { top: 20%; left: 90%; animation-duration: 20s; }
+    .doodle:nth-child(4) { top: 70%; left: 90%; animation-duration: 30s; border-radius: 30%; }
+    .doodle:nth-child(5) { top: 40%; left: 45%; animation-duration: 24s; }
+
+    @keyframes float {
+      0%   { transform: translateY(0) rotate(0deg); }
+      50%  { transform: translateY(-60px) rotate(180deg); }
+      100% { transform: translateY(0) rotate(360deg); }
+    }
+    /* ============================================================= */
+
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --accent: #4f46e5;
+      --muted: #94a3b8;
+      --glass: rgba(255, 255, 255, 0.04);
+      --radius: 12px;
+      --gap: 16px;
+    }
+
+    * { box-sizing: border-box }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      color: #e6eef8;
+      background: transparent;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* ===== rest of your original CSS UNCHANGED ===== */
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius: 16px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+    }
+
+    header {
+      grid-column: 1/-1;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    header h1 { font-size: 20px; margin: 0; }
+    header p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .left, .right {
+      background: var(--card);
+      padding: 14px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .video-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    video { width: 100%; max-height: 520px; }
+    canvas { position: absolute; inset: 0; pointer-events: none; }
+
+    button {
+      background: var(--accent);
+      border: 0;
+      color: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--glass);
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .pred {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .muted { color: var(--muted); font-size: 13px; }
+
+    @media(max-width:900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<script>
+  const doodles = document.querySelectorAll('.doodle');
+
+  document.addEventListener('mousemove', (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 20;
+    const y = (e.clientY / window.innerHeight - 0.5) * 20;
+
+    doodles.forEach((d, i) => {
+      const depth = (i + 1) * 0.6;
+      d.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+    });
+  });
+</script>
+
+
+<body>
+
+  <!-- DOODLE BACKGROUND LAYER -->
+  <div class="doodle-bg">
+  <div class="doodle"><span>✋</span></div>
+  <div class="doodle"><span>🤟</span></div>
+  <div class="doodle"><span>🖐️</span></div>
+  <div class="doodle"><span>🤞</span></div>
+  <div class="doodle"><span>👌</span></div>
+</div>
+
+</body>
+</html>
